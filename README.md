@@ -1,1 +1,1 @@
-# CPP-Advanced-Logger-Class
+# Advanced-C++-Logger-Class
