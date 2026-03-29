@@ -1,0 +1,195 @@
+#include "LogFileWriter.h"
+
+// Librerias C++
+
+// herramienta base de C++ para leer y escribir datos en archivos físicos en el disco duro.
+#include <fstream>
+
+// librería de gestión de tiempo de alta precisión de C++ estándar.
+#include <chrono>
+
+// sstream sirve para "leer/escribir" dentro de un String como si fuera un archivo o una consola.
+#include <sstream>
+
+//formateo estético y profesional de los datos.
+#include <iomanip>
+
+// have access to std::cerr and std:.cout
+#include <iostream>
+
+
+// For using it in Python 
+#include <pybind11/pybind11.h>
+namespace py = pybind11;
+
+// Log file name defined as constant
+static const char* LOG_FILENAME = "QuickFolderSynchroPRO.log";
+
+// Translates your internal enum values into human-readable text for your log file.
+// It is used to generate the string that will be stored with respect to the enum
+const char* levels[] = {"DEBUG", "INFO", "WARN", "ERROR", "FATAL"};
+
+// Constructor
+LogFileWriter::LogFileWriter() {
+
+    // Setting this object as singleton
+    singleton = this;
+
+    // Launching a background thread that runs the process_logs member function when he is woken up
+    worker_thread = std::thread(&LogFileWriter::process_logs, this);
+}
+
+LogFileWriter::~LogFileWriter() {
+
+    // we set the should_exit flag
+    should_exit = true;
+
+    // Awaken all the threads at once.
+    cv.notify_all();
+
+    // Bloquea el hilo principal (el de Godot) y le dice: 
+    // "Espera un momento, no cierres la aplicación todavía; tenemos que esperar a que el hilo del trabajador termine lo que está haciendo y se cierre correctamente".
+    if (worker_thread.joinable()) worker_thread.join();
+
+    // When we close the game, we also clear the pointer
+    if (singleton == this) singleton = nullptr;
+}
+
+
+// Function that sets the minimum level from which logs will be saved
+void LogFileWriter::set_min_level(int p_level) { min_level = p_level; }
+
+
+// C++ method to put an item in the FIFO of LogEntry and wake up the process_logs method to write the item
+void LogFileWriter::_log_internal(LogLevel p_level, const std::string &p_msg, const std::string& p_file, int p_line, bool isStdOutput) {
+
+    // Their job is to prevent the system from wasting time processing messages that the user has decided to ignore.
+    if ((int)p_level < min_level.load()) return;
+
+    // code block
+    {
+        // Mutex management
+        std::lock_guard<std::mutex> lock(queue_mutex);
+
+        // Insert LogEntry object into FIFO
+        log_queue.push({(int)p_level, p_msg, get_timestamp(), p_file, p_line, isStdOutput});
+    }
+
+    // This line is the "bell" that wakes up the writing thread (process_log) so that it is not consuming CPU 100% of the time
+    cv.notify_one();
+}
+
+
+// Method for writing to the destination file
+void LogFileWriter::process_logs() {
+
+    // These lines are exclusive to Godot
+    // Telling Godot to save the log file in the persistent user data folder.
+    // String godot_path = String("user://") + LOG_FILENAME;
+    // Converting that virtual path into a real, absolute OS path
+    // String path = ProjectSettings::get_singleton()->globalize_path(godot_path);
+
+    // Version C++ only. Just creating the log file by LOG_FILENAME
+    std::string path = LOG_FILENAME;
+    
+    // Officially moved from Godot’s built-in wrappers to Standard C++ File I/O.
+    // std::ofstream file(path.utf8().get_data(), std::ios::app);
+
+    // Version C++ only
+    std::ofstream file(path, std::ios::trunc);
+
+
+    // We want the thread to be available throughout the entire life of the game.
+    while (true) {
+
+        LogEntry entry;
+
+        // In multithreading programming, the curly braces {} limit the "scope" of the mutex
+        {
+            // the worker thread has exclusive access to log_queue
+            std::unique_lock<std::mutex> lock(queue_mutex);
+
+            // cv.wait puts the thread into a deep sleep, freeing up processor resources until something interesting happens
+            cv.wait(lock, [this] { return !log_queue.empty() || should_exit; });
+
+            // This is your safe exit protocol.
+            if (should_exit && log_queue.empty()) break;
+
+            // performing a "transfer of ownership" instead of an expensive copy.
+            entry = std::move(log_queue.front());
+
+            // The node you just "emptied" with std::move is permanently removed from the queue's memory, making room for the next messages.
+            log_queue.pop();
+        }
+
+        // The String we want to display in the file is created in C++
+        std::ostringstream ss;
+        ss << "[" << entry.timestamp << "] "
+        << "[" << levels[entry.level] << "] "
+        << "[" << entry.file << ":" << entry.line << "] "
+        << entry.message;
+        std::string output = ss.str();
+
+        // Print to output error or fatal messages, other levels depends on entry.isStdOutput, only if entry.isStdOutput is true is printed
+        if (entry.level >= ERROR) std::cerr << output << std::endl;
+        else if (entry.isStdOutput) std::cout << output << std::endl;
+
+        // Everything is Writing to file
+        if (file.is_open()) {
+            file << output << std::endl;
+            file.flush();
+        }
+    }
+}
+
+// Obtiene la fecha actual de forma profesional
+std::string LogFileWriter::get_timestamp() {
+
+    // Using the modern C++ way to handle time
+    // 1. Get the current time point
+    auto now = std::chrono::system_clock::now();
+
+    // 1. Get miliseconds
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+
+    // 2. Convert to time_t for formatting
+    auto t = std::chrono::system_clock::to_time_t(now);
+    
+    // 3. Thread-safe conversion to local time
+    std::basic_ostringstream<char> ss;
+
+    std::tm lt;
+    #ifdef _WIN32
+        localtime_s(&lt, &t); 
+    #else
+        localtime_r(&t, &lt);
+    #endif
+
+    // 4. The line you provided: format and "pipe" into the stream
+    ss << std::put_time(&lt, "%H:%M:%S")<< '.' << std::setfill('0') << std::setw(3) << ms.count();
+
+    // 5. Return as a std::string
+    return std::string(ss.str());    
+}
+
+// Create the Python module
+//This code is the "bridge" that exports your C++ code as a Python module
+//This defines the module name
+
+PYBIND11_MODULE(LogFileWriter, m) {
+    // This exposes your C++ class LogFileWriter to Python
+    // In Python, the class will be renamed to Writer. Usage: obj = LogFileWriter.Writer("test.txt").
+    py::class_<LogFileWriter>(m, "Writer")
+    //This binds the constructor.
+    .def(py::init<const std::string &>()) // Bind constructor
+    //This binds a specific member function.
+    .def("set_min_level", &LogFileWriter::set_min_level); // Bind method
+
+    py::enum_<LogLevel>(m, "LogLevel")
+        .value("DEBUG", LogLevel.DEBUG)
+        .value("INFO", LogLevel.INFO)
+        .value("WARN", LogLevel.WARN)
+        .value("ERROR", LogLevel.ERROR)
+        .value("FATAL", LogLevel.FATAL)
+        .export_values();
+}
