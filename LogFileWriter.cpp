@@ -1,17 +1,17 @@
 #include "LogFileWriter.h"
 
-// Librerias C++
+// C++ Libraries
 
-// herramienta base de C++ para leer y escribir datos en archivos físicos en el disco duro.
+// C++ base tool for reading and writing data to physical files on the hard drive.
 #include <fstream>
 
-// librería de gestión de tiempo de alta precisión de C++ estándar.
+// standard C++ high-precision time management library.
 #include <chrono>
 
-// sstream sirve para "leer/escribir" dentro de un String como si fuera un archivo o una consola.
+// sstream is used to "read/write" within a String as if it were a file or a console.
 #include <sstream>
 
-//formateo estético y profesional de los datos.
+// aesthetic and professional formatting of the data.
 #include <iomanip>
 
 // have access to std::cerr and std:.cout
@@ -47,11 +47,11 @@ LogFileWriter::~LogFileWriter() {
     // Awaken all the threads at once.
     cv.notify_all();
 
-    // Bloquea el hilo principal (el de Godot) y le dice: 
-    // "Espera un momento, no cierres la aplicación todavía; tenemos que esperar a que el hilo del trabajador termine lo que está haciendo y se cierre correctamente".
+    // He blocks the main thread (Godot's) and says:
+    // "Wait a moment, don't close the application yet; we have to wait for the worker thread to finish what it's doing and close properly."
     if (worker_thread.joinable()) worker_thread.join();
 
-    // When we close the game, we also clear the pointer
+    // When we close, we also set the pointer to nullptr
     if (singleton == this) singleton = nullptr;
 }
 
@@ -81,25 +81,15 @@ void LogFileWriter::_log_internal(LogLevel p_level, const std::string &p_msg, co
 
 
 // Method for writing to the destination file
-void LogFileWriter::process_logs() {
-
-    // These lines are exclusive to Godot
-    // Telling Godot to save the log file in the persistent user data folder.
-    // String godot_path = String("user://") + LOG_FILENAME;
-    // Converting that virtual path into a real, absolute OS path
-    // String path = ProjectSettings::get_singleton()->globalize_path(godot_path);
+void LogFileWriter::process_logs() {    
 
     // Version C++ only. Just creating the log file by LOG_FILENAME
     std::string path = LOG_FILENAME;
-    
-    // Officially moved from Godot’s built-in wrappers to Standard C++ File I/O.
-    // std::ofstream file(path.utf8().get_data(), std::ios::app);
 
     // Version C++ only
     std::ofstream file(path, std::ios::trunc);
 
-
-    // We want the thread to be available throughout the entire life of the game.
+    // We want the thread to be available throughout the entire life.
     while (true) {
 
         LogEntry entry;
@@ -142,7 +132,7 @@ void LogFileWriter::process_logs() {
     }
 }
 
-// Obtiene la fecha actual de forma profesional
+// Get the current date professionally
 std::string LogFileWriter::get_timestamp() {
 
     // Using the modern C++ way to handle time
@@ -178,7 +168,7 @@ std::string LogFileWriter::get_timestamp() {
 
 PYBIND11_MODULE(LogFileWriter, m) {
     // This exposes your C++ class LogFileWriter to Python
-    // In Python, the class will be renamed to Writer. Usage: obj = LogFileWriter.Writer("test.txt").
+    // In Python, the class will be renamed to Writer. Usage: obj = LogFileWriter.Writer().
     py::class_<LogFileWriter>(m, "Writer")
     //This binds the constructor.
     .def(py::init<const std::string &>()) // Bind constructor
