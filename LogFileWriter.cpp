@@ -174,6 +174,11 @@ PYBIND11_MODULE(LogFileWriter, m) {
     .def(py::init<const std::string &>()) // Bind constructor
     //This binds a specific member function.
     .def("set_min_level", &LogFileWriter::set_min_level); // Bind method
+    .def("LOG_DEBUG", [](std::string message, bool isStdOutput) { return LOG_DEBUG(message, isStdOutput); })
+    .def("LOG_INFO", [](std::string message, bool isStdOutput) { return LOG_INFO(message, isStdOutput); })
+    .def("LOG_WARN", [](std::string message, bool isStdOutput) { return LOG_WARN(message, isStdOutput); })
+    .def("LOG_ERROR", [](std::string message, bool isStdOutput) { return LOG_ERROR(message, isStdOutput); })
+    .def("LOG_FATAL", [](std::string message, bool isStdOutput) { return LOG_FATAL(message, isStdOutput); });
 
     py::enum_<LogLevel>(m, "LogLevel")
         .value("DEBUG", LogLevel.DEBUG)

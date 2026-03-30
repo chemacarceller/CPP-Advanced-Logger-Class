@@ -73,10 +73,10 @@ class LogFileWriter {
 };
 
 // C++ Helper Macros. To use in pure C++
-#define LOG_DEBUG(m) { std::string _temp_file = __FILE__; LogFileWriter::get_singleton()->_log_internal(LogFileWriter::DEBUG, m, _temp_file, __LINE__) }
-#define LOG_INFO(m) { std::string _temp_file = __FILE__; LogFileWriter::get_singleton()->_log_internal(LogFileWriter::INFO, m, _temp_file, __LINE__) }
-#define LOG_WARN(m) { std::string _temp_file = __FILE__; LogFileWriter::get_singleton()->_log_internal(LogFileWriter::WARN, m, _temp_file, __LINE__) }
-#define LOG_ERR(m)  { std::string _temp_file = __FILE__; LogFileWriter::get_singleton()->_log_internal(LogFileWriter::ERROR, m, _temp_file, __LINE__) }
-#define LOG_FATAL(m)  { std::string _temp_file = __FILE__; LogFileWriter::get_singleton()->_log_internal(LogFileWriter::FATAL, m, _temp_file, __LINE__) }
+#define LOG_DEBUG(m, isStdOutput) { std::string _temp_file = __FILE__; LogFileWriter::get_singleton()->_log_internal(LogFileWriter::DEBUG, m, _temp_file, __LINE__ , isStdOutput) }
+#define LOG_INFO(m, isStdOutput) { std::string _temp_file = __FILE__; LogFileWriter::get_singleton()->_log_internal(LogFileWriter::INFO, m, _temp_file, __LINE__ , isStdOutput) }
+#define LOG_WARN(m, isStdOutput) { std::string _temp_file = __FILE__; LogFileWriter::get_singleton()->_log_internal(LogFileWriter::WARN, m, _temp_file, __LINE__ , isStdOutput) }
+#define LOG_ERR(m, isStdOutput)  { std::string _temp_file = __FILE__; LogFileWriter::get_singleton()->_log_internal(LogFileWriter::ERROR, m, _temp_file, __LINE__ , isStdOutput) }
+#define LOG_FATAL(m, isStdOutput)  { std::string _temp_file = __FILE__; LogFileWriter::get_singleton()->_log_internal(LogFileWriter::FATAL, m, _temp_file, __LINE__ , isStdOutput) }
 
 #endif
