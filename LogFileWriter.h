@@ -8,6 +8,7 @@
 #include <string>
 #include <condition_variable>
 #include <thread>
+#include <atomic>
 
 class LogFileWriter {
 
@@ -73,10 +74,24 @@ class LogFileWriter {
 };
 
 // C++ Helper Macros. To use in pure C++
-#define LOG_DEBUG(m, isStdOutput) { std::string _temp_file = __FILE__; LogFileWriter::get_singleton()->_log_internal(LogFileWriter::DEBUG, m, _temp_file, __LINE__ , isStdOutput) }
-#define LOG_INFO(m, isStdOutput) { std::string _temp_file = __FILE__; LogFileWriter::get_singleton()->_log_internal(LogFileWriter::INFO, m, _temp_file, __LINE__ , isStdOutput) }
-#define LOG_WARN(m, isStdOutput) { std::string _temp_file = __FILE__; LogFileWriter::get_singleton()->_log_internal(LogFileWriter::WARN, m, _temp_file, __LINE__ , isStdOutput) }
-#define LOG_ERR(m, isStdOutput)  { std::string _temp_file = __FILE__; LogFileWriter::get_singleton()->_log_internal(LogFileWriter::ERROR, m, _temp_file, __LINE__ , isStdOutput) }
-#define LOG_FATAL(m, isStdOutput)  { std::string _temp_file = __FILE__; LogFileWriter::get_singleton()->_log_internal(LogFileWriter::FATAL, m, _temp_file, __LINE__ , isStdOutput) }
+#define LOG_DEBUG(m, isStdOutput) \
+    ((void)(LogFileWriter::get_singleton()->_log_internal( \
+        LogFileWriter::DEBUG, (m), __FILE__, __LINE__, (isStdOutput))))
+
+#define LOG_INFO(m, isStdOutput) \
+    ((void)(LogFileWriter::get_singleton()->_log_internal( \
+        LogFileWriter::INFO, (m), __FILE__, __LINE__, (isStdOutput))))
+
+#define LOG_WARN(m, isStdOutput) \
+    ((void)(LogFileWriter::get_singleton()->_log_internal( \
+        LogFileWriter::WARN, (m), __FILE__, __LINE__, (isStdOutput))))
+
+#define LOG_ERROR(m, isStdOutput) \
+    ((void)(LogFileWriter::get_singleton()->_log_internal( \
+        LogFileWriter::ERROR, (m), __FILE__, __LINE__, (isStdOutput))))
+
+#define LOG_FATAL(m, isStdOutput) \
+    ((void)(LogFileWriter::get_singleton()->_log_internal( \
+        LogFileWriter::FATAL, (m), __FILE__, __LINE__, (isStdOutput))))
 
 #endif

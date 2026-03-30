@@ -167,24 +167,27 @@ std::string LogFileWriter::get_timestamp() {
 //This defines the module name
 
 PYBIND11_MODULE(LogFileWriter, m) {
+
     // This exposes your C++ class LogFileWriter to Python
     // In Python, the class will be renamed to Writer. Usage: obj = LogFileWriter.Writer().
     py::class_<LogFileWriter>(m, "Writer")
-    //This binds the constructor.
-    .def(py::init<const std::string &>()) // Bind constructor
+    
+    // Bind the static singleton accessor
+    .def_static("get_instance", &LogFileWriter::get_singleton, py::return_value_policy::reference)
+    
     //This binds a specific member function.
-    .def("set_min_level", &LogFileWriter::set_min_level); // Bind method
+    .def("set_min_level", &LogFileWriter::set_min_level)
     .def("LOG_DEBUG", [](std::string message, bool isStdOutput) { return LOG_DEBUG(message, isStdOutput); })
     .def("LOG_INFO", [](std::string message, bool isStdOutput) { return LOG_INFO(message, isStdOutput); })
     .def("LOG_WARN", [](std::string message, bool isStdOutput) { return LOG_WARN(message, isStdOutput); })
     .def("LOG_ERROR", [](std::string message, bool isStdOutput) { return LOG_ERROR(message, isStdOutput); })
     .def("LOG_FATAL", [](std::string message, bool isStdOutput) { return LOG_FATAL(message, isStdOutput); });
 
-    py::enum_<LogLevel>(m, "LogLevel")
-        .value("DEBUG", LogLevel.DEBUG)
-        .value("INFO", LogLevel.INFO)
-        .value("WARN", LogLevel.WARN)
-        .value("ERROR", LogLevel.ERROR)
-        .value("FATAL", LogLevel.FATAL)
+    py::enum_<LogFileWriter::LogLevel>(m, "LogLevel")
+        .value("DEBUG", LogFileWriter::LogLevel::DEBUG)
+        .value("INFO", LogFileWriter::LogLevel::INFO)
+        .value("WARN", LogFileWriter::LogLevel::WARN)
+        .value("ERROR", LogFileWriter::LogLevel::ERROR)
+        .value("FATAL", LogFileWriter::LogLevel::FATAL)
         .export_values();
 }
