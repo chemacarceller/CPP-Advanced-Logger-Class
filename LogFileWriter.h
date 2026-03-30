@@ -26,7 +26,13 @@ class LogFileWriter {
         void set_min_level(int p_level);
 
         // LogFileWriter is a singleton; this is the method that returns the single instance of the object.
-        static LogFileWriter* get_singleton() { return singleton; }
+        static LogFileWriter* get_singleton() { 
+            if (singleton == nullptr) {
+                singleton = new LogFileWriter(); // Se crea aquí la primera vez
+            }
+            return singleton;
+        }
+
 
         // Constructor & Destructor
         LogFileWriter();
@@ -76,22 +82,22 @@ class LogFileWriter {
 // C++ Helper Macros. To use in pure C++
 #define LOG_DEBUG(m, isStdOutput) \
     ((void)(LogFileWriter::get_singleton()->_log_internal( \
-        LogFileWriter::DEBUG, (m), __FILE__, __LINE__, (isStdOutput))))
+        LogFileWriter::LogLevel::DEBUG, (m), __FILE__, __LINE__, isStdOutput)))
 
 #define LOG_INFO(m, isStdOutput) \
     ((void)(LogFileWriter::get_singleton()->_log_internal( \
-        LogFileWriter::INFO, (m), __FILE__, __LINE__, (isStdOutput))))
+        LogFileWriter::LogLevel::INFO, (m), __FILE__, __LINE__, isStdOutput)))
 
 #define LOG_WARN(m, isStdOutput) \
     ((void)(LogFileWriter::get_singleton()->_log_internal( \
-        LogFileWriter::WARN, (m), __FILE__, __LINE__, (isStdOutput))))
+        LogFileWriter::LogLevel::WARN, (m), __FILE__, __LINE__, isStdOutput)))
 
 #define LOG_ERROR(m, isStdOutput) \
     ((void)(LogFileWriter::get_singleton()->_log_internal( \
-        LogFileWriter::ERROR, (m), __FILE__, __LINE__, (isStdOutput))))
+        LogFileWriter::LogLevel::ERROR, (m), __FILE__, __LINE__, isStdOutput)))
 
 #define LOG_FATAL(m, isStdOutput) \
     ((void)(LogFileWriter::get_singleton()->_log_internal( \
-        LogFileWriter::FATAL, (m), __FILE__, __LINE__, (isStdOutput))))
+        LogFileWriter::LogLevel::FATAL, (m), __FILE__, __LINE__, isStdOutput)))
 
 #endif

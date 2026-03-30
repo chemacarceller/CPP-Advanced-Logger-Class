@@ -172,16 +172,15 @@ PYBIND11_MODULE(LogFileWriter, m) {
     // In Python, the class will be renamed to Writer. Usage: obj = LogFileWriter.Writer().
     py::class_<LogFileWriter>(m, "Writer")
     
-    // Bind the static singleton accessor
     .def_static("get_instance", &LogFileWriter::get_singleton, py::return_value_policy::reference)
     
     //This binds a specific member function.
     .def("set_min_level", &LogFileWriter::set_min_level)
-    .def("LOG_DEBUG", [](std::string message, bool isStdOutput) { return LOG_DEBUG(message, isStdOutput); })
-    .def("LOG_INFO", [](std::string message, bool isStdOutput) { return LOG_INFO(message, isStdOutput); })
-    .def("LOG_WARN", [](std::string message, bool isStdOutput) { return LOG_WARN(message, isStdOutput); })
-    .def("LOG_ERROR", [](std::string message, bool isStdOutput) { return LOG_ERROR(message, isStdOutput); })
-    .def("LOG_FATAL", [](std::string message, bool isStdOutput) { return LOG_FATAL(message, isStdOutput); });
+    .def_static("LOG_DEBUG", [](std::string message, bool isStdOutput=true) { LOG_DEBUG(message, isStdOutput); }, py::arg("message"), py::arg("isStdOutput") = true)
+    .def_static("LOG_INFO", [](std::string message, bool isStdOutput=true) { LOG_INFO(message, isStdOutput); }, py::arg("message"), py::arg("isStdOutput") = true)
+    .def_static("LOG_WARN", [](std::string message, bool isStdOutput=true) { LOG_WARN(message, isStdOutput); }, py::arg("message"), py::arg("isStdOutput") = true)
+    .def_static("LOG_ERROR", [](std::string message, bool isStdOutput=true) { LOG_ERROR(message, isStdOutput); }, py::arg("message"), py::arg("isStdOutput") = true)
+    .def_static("LOG_FATAL", [](std::string message, bool isStdOutput=true) { LOG_FATAL(message, isStdOutput); }, py::arg("message"), py::arg("isStdOutput") = true);
 
     py::enum_<LogFileWriter::LogLevel>(m, "LogLevel")
         .value("DEBUG", LogFileWriter::LogLevel::DEBUG)
