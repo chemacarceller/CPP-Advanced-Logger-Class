@@ -1,4 +1,4 @@
-# Godot Advanced-C++-Logger-Class
+# CPP Advanced-C++-Logger-Class
 
 MyLogger is an advanced C++ class for creating a log file for Godot
 
