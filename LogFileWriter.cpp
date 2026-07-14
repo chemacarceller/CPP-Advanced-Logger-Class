@@ -1,5 +1,7 @@
 #include "LogFileWriter.h"
 
+#include <godot_cpp/core/error_macros.hpp>
+
 // C++ Libraries
 
 // C++ base tool for reading and writing data to physical files on the hard drive.
@@ -18,13 +20,11 @@
 #include <iostream>
 
 
-// For using it in Python 
-#include <pybind11/pybind11.h>
-namespace py = pybind11;
+using namespace godot;
 
 
 // Log file name defined as constant
-static const char* LOG_FILENAME = "QuickFolderSynchroAdvanced.log";
+static const char* LOG_FILENAME = "game_session.log";
 
 // Translates your internal enum values into human-readable text for your log file.
 // It is used to generate the string that will be stored with respect to the enum
@@ -36,14 +36,10 @@ LogFileWriter::LogFileWriter() {
     // Setting this object as singleton
     singleton = this;
 
-    // Lanza un nuevo hilo de ejecución (thread). 
-    // Empieza a ejecutar process_logs.
-    // Guardamos referencia al hilo de ejecución en la variable worker_thread
+    // Launching a background thread that runs the process_logs member function when he is woken up
     worker_thread = std::thread(&LogFileWriter::process_logs, this);
 }
 
-
-// Destructor
 LogFileWriter::~LogFileWriter() {
 
     // we set the should_exit flag
@@ -52,10 +48,11 @@ LogFileWriter::~LogFileWriter() {
     // Awaken all the threads at once.
     cv.notify_all();
 
-    // The destructor stops and waits for the worker_thread to finish its function
+    // He blocks the main thread (Godot's) and says:
+    // "Wait a moment, don't close the application yet; we have to wait for the worker thread to finish what it's doing and close properly."
     if (worker_thread.joinable()) worker_thread.join();
 
-    // When we close, we also set the pointer to nullptr
+    // When we close the game, we also clear the pointer
     if (singleton == this) singleton = nullptr;
 }
 
@@ -79,6 +76,15 @@ void LogFileWriter::resetLogFile() {
 }
 
 
+// Method called from GDSCRIPT to register LogEntry in FIFO and wake up file writing
+// Also called from the functions debug() info() warn() error() and fatal()
+void LogFileWriter::log_gd(int p_level, const String &p_msg, const String &p_file, int p_line, bool isStdOutput) {
+
+    // This line is the communication bridge between the world of GDScript (dynamic and flexible) and your C++ logging engine (strict and fast).
+    _log_internal(static_cast<LogLevel>(p_level), std::string(p_msg.utf8().get_data(), p_msg.utf8().length()), std::string(p_file.utf8().get_data(), p_file.utf8().length()), p_line, isStdOutput);
+}
+
+
 // C++ method to put an item in the FIFO of LogEntry and wake up the process_logs method to write the item
 void LogFileWriter::_log_internal(LogLevel p_level, const std::string &p_msg, const std::string& p_file, int p_line, bool isStdOutput) {
 
@@ -87,7 +93,7 @@ void LogFileWriter::_log_internal(LogLevel p_level, const std::string &p_msg, co
 
     // code block
     {
-        // It ensures that only one thread of execution accesses the queue; it would block if another thread of execution were accessing it.
+        // Mutex management
         std::lock_guard<std::mutex> lock(queue_mutex);
 
         // Insert LogEntry object into FIFO
@@ -142,8 +148,17 @@ void LogFileWriter::process_logs() {
             std::string output = ss.str();
 
             // Print to output error or fatal messages, other levels depends on entry.isStdOutput, only if entry.isStdOutput is true is printed
-            if (entry.level >= ERROR) std::cerr << output << std::endl;
-            else if (entry.isStdOutput) std::cout << output << std::endl;
+            if (entry.level >= ERROR) { 
+                ERR_PRINT(output.c_str());
+                ERROR_PRINT(output.c_str());
+            }
+            else if ( (entry.level == WARN) &&  (entry.isStdOutput) ) { 
+                WARN_PRINT(output.c_str());
+                WARNING_PRINT(output.c_str());
+            }
+            else if (entry.isStdOutput) {
+                INFO_PRINT(output.c_str());
+            }
 
             // Everything is Writing to file
             if (file.is_open()) {
@@ -196,37 +211,26 @@ std::string LogFileWriter::get_timestamp() {
 }
 
 
+// Only for Godot to make the bindings
+void LogFileWriter::_bind_methods() {
 
-// Create the Python module
-//This code is the "bridge" that exports your C++ code as a Python module
-//This defines the module name
+    // Record of methods for Godot to see.
+    ClassDB::bind_method(D_METHOD("set_min_level", "level"), &LogFileWriter::set_min_level);
+    ClassDB::bind_method(D_METHOD("resetLogFile"), &LogFileWriter::resetLogFile);
+    ClassDB::bind_method(D_METHOD("log", "level", "message"), &LogFileWriter::log_gd, "GDSCRIPT", 0, true);
+    ClassDB::bind_static_method("LogFileWriter", D_METHOD("get_instance"), &LogFileWriter::get_singleton);
 
-PYBIND11_MODULE(LogFileWriter, m) {
+    ClassDB::bind_method(D_METHOD("debug", "message"), &LogFileWriter::debug, "GDSCRIPT", 0, true);
+    ClassDB::bind_method(D_METHOD("info", "message"), &LogFileWriter::info, "GDSCRIPT", 0, true);
+    ClassDB::bind_method(D_METHOD("warn", "message"), &LogFileWriter::warn, "GDSCRIPT", 0,  true);
+    ClassDB::bind_method(D_METHOD("error", "message"), &LogFileWriter::error, "GDSCRIPT", 0,  true);
+    ClassDB::bind_method(D_METHOD("fatal", "message"), &LogFileWriter::fatal, "GDSCRIPT", 0,  true);
 
-    // This exposes your C++ class LogFileWriter to Python
-    // In Python, the class will be renamed to Writer. Usage: obj = LogFileWriter.Writer().
-    py::class_<LogFileWriter>(m, "Writer")
-    
-    // exposing a Singleton pattern so that it can be used in Python.
-    // In Python, you will get an object like ogger = LogFileWriter.Writer.get_instance()
-    .def_static("get_instance", &LogFileWriter::get_singleton, py::return_value_policy::reference)
-    
-    // Non-static methods available in Python
-    .def("set_min_level", &LogFileWriter::set_min_level)
-    .def("resetLogFile", &LogFileWriter::resetLogFile)
-    // Static methods available in Python; they call macros
-    .def_static("LOG_DEBUG", [](std::string message, const std::string& p_file, int p_line, bool isStdOutput=true) { LOG_DEBUG(message, p_file, p_line, isStdOutput); }, py::arg("message"), py::arg("p_file")=__FILE__, py::arg("p_line")=__LINE__, py::arg("isStdOutput") = true)
-    .def_static("LOG_INFO", [](std::string message, const std::string& p_file, int p_line, bool isStdOutput=true) { LOG_INFO(message, p_file, p_line, isStdOutput); }, py::arg("message"), py::arg("p_file")=__FILE__, py::arg("p_line")=__LINE__, py::arg("isStdOutput") = true)
-    .def_static("LOG_WARN", [](std::string message, const std::string& p_file, int p_line, bool isStdOutput=true) { LOG_WARN(message, p_file, p_line, isStdOutput); }, py::arg("message"), py::arg("p_file")=__FILE__, py::arg("p_line")=__LINE__, py::arg("isStdOutput") = true)
-    .def_static("LOG_ERROR", [](std::string message, const std::string& p_file, int p_line, bool isStdOutput=true) { LOG_ERROR(message, p_file, p_line, isStdOutput); }, py::arg("message"), py::arg("p_file")=__FILE__, py::arg("p_line")=__LINE__, py::arg("isStdOutput") = true)
-    .def_static("LOG_FATAL", [](std::string message, const std::string& p_file, int p_line, bool isStdOutput=true) { LOG_FATAL(message, p_file, p_line, isStdOutput); }, py::arg("message"), py::arg("p_file")=__FILE__, py::arg("p_line")=__LINE__, py::arg("isStdOutput") = true);
-
-    // This binds the enum values
-    py::enum_<LogFileWriter::LogLevel>(m, "LogLevel")
-        .value("DEBUG", LogFileWriter::LogLevel::DEBUG)
-        .value("INFO", LogFileWriter::LogLevel::INFO)
-        .value("WARN", LogFileWriter::LogLevel::WARN)
-        .value("ERROR", LogFileWriter::LogLevel::ERROR)
-        .value("FATAL", LogFileWriter::LogLevel::FATAL)
-        .export_values();
+    // It exposes a C++ enum value to the Godot Editor and GDScript 
+    // so that you can use it by name (e.g., MyClass.DEBUG) instead of a raw integer.
+    BIND_ENUM_CONSTANT(DEBUG);
+    BIND_ENUM_CONSTANT(INFO);
+    BIND_ENUM_CONSTANT(WARN);
+    BIND_ENUM_CONSTANT(ERROR);
+    BIND_ENUM_CONSTANT(FATAL);
 }
